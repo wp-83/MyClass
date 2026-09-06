@@ -22,7 +22,6 @@ public class StudentController {
 
     @GetMapping
     public List<StudentResponseDTO> allStudents(){
-
         return studentService.getAllStudents();
     }
 
