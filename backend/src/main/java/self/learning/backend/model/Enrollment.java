@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.cglib.core.Local;
 
 import java.time.LocalDateTime;
 
@@ -34,4 +35,18 @@ public class Enrollment {
     @ManyToOne
     @JoinColumn(name = "course_id")
     private Course course;
+
+    @PrePersist
+    protected void onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+
+        this.enrollAt = now;
+        this.lastUpdate = now;
+        this.status = EnrollmentStatus.ACTIVE;
+    }
+
+    @PreUpdate
+    protected void onUpdate(){
+        this.lastUpdate = LocalDateTime.now();
+    }
 }

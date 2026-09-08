@@ -1,9 +1,6 @@
 package self.learning.backend.dto.student;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.validator.constraints.Range;
@@ -11,12 +8,12 @@ import org.hibernate.validator.constraints.Range;
 @Getter
 @Setter
 public class StudentDetailDTO {
-    @NotBlank
+    @NotNull
     @Min(1)
     @Max(10)
     private Integer semester;
 
-    @NotBlank
+    @NotNull
     @Min(2)
     @Max(144)
     private Integer maxCredit;
