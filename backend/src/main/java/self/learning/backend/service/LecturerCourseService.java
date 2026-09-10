@@ -81,6 +81,15 @@ public class LecturerCourseService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The schedule has been occupied by other course.");
         }
 
+        Schedule scheduleBefore = lecturerCourse.getSchedule();
+        Schedule currentSchedule = request.getSchedule();
+
+        scheduleBefore.setIsOccupied(Boolean.FALSE);
+        currentSchedule.setIsOccupied(Boolean.TRUE);
+
+        scheduleRepository.save(scheduleBefore);
+        scheduleRepository.save(currentSchedule);
+
         lecturerCourse.setSchedule(request.getSchedule());
         lecturerCourseRepository.save(lecturerCourse);
     }

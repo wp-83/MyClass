@@ -23,13 +23,15 @@ public class EnrollmentService {
     private final StudentDetailRepository studentDetailRepository;
     private final CourseRepository courseRepository;
     private final LecturerCourseRepository lecturerCourseRepository;
+    private final ScheduleRepository scheduleRepository;
 
-    public EnrollmentService(EnrollmentRepository enrollmentRepository, StudentRepository studentRepository, StudentDetailRepository studentDetailRepository, CourseRepository courseRepository, LecturerCourseRepository lecturerCourseRepository) {
+    public EnrollmentService(EnrollmentRepository enrollmentRepository, StudentRepository studentRepository, StudentDetailRepository studentDetailRepository, CourseRepository courseRepository, LecturerCourseRepository lecturerCourseRepository, ScheduleRepository scheduleRepository) {
         this.enrollmentRepository = enrollmentRepository;
         this.studentRepository = studentRepository;
         this.studentDetailRepository = studentDetailRepository;
         this.courseRepository = courseRepository;
         this.lecturerCourseRepository = lecturerCourseRepository;
+        this.scheduleRepository = scheduleRepository;
     }
 
     public List<StudentEnrollmentResponseDTO> allEnrollmentByStudent(){
@@ -145,11 +147,14 @@ public class EnrollmentService {
 
         for (LecturerCourse lc : lecturerCourses){
             Enrollment enrollment = new Enrollment();
-
             enrollment.setStudent(student);
             enrollment.setLecturerCourse(lc);
 
+            Schedule schedule = lc.getSchedule();
+            schedule.setTotalEnroll(schedule.getTotalEnroll() + 1);
+
             enrollmentRepository.save(enrollment);
+            scheduleRepository.save(schedule);
         }
     }
 
@@ -157,7 +162,7 @@ public class EnrollmentService {
         The update concept:
             There will be a button in the frontend. If someone click it, all the enrollment status will be updated into DONE.
             Student can't do the modification of selected courses or adding new course. Student must re-enroll if there is any changes.
-            The changes must start with removing all the enrolled courses by the admin.
+            So, the admin must remove all the enrolled courses and student re-enroll again.
      */
     public void changeEnrollmentStatus(Long studentId){
         List<Enrollment> enrollments = enrollmentRepository.findAllByStudentId(studentId);
@@ -174,6 +179,7 @@ public class EnrollmentService {
         Student student = studentRepository.findById(studentId).orElseThrow();
         StudentDetail studentDetail = student.getStudentDetail();
         studentDetail.setSemester(studentDetail.getSemester() + 1);
+
         studentDetailRepository.save(studentDetail);
     }
 
@@ -186,6 +192,12 @@ public class EnrollmentService {
 
         if (enrollments.size() <= 0){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No enrollment by the student.");
+        }
+
+        for (Enrollment enrollment : enrollments){
+            Schedule schedule = enrollment.getLecturerCourse().getSchedule();
+            schedule.setCapacity(schedule.getCapacity() - 1);
+            scheduleRepository.save(schedule);
         }
 
         enrollmentRepository.deleteAllById(enrollments.stream().map(Enrollment::getId).toList());
