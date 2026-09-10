@@ -24,11 +24,6 @@ public class Lecturer {
     @Column(name = "department")
     private String department;
 
-    @ManyToMany
-    @JoinTable(
-            name = "lecturer_courses",
-            joinColumns = @JoinColumn(name = "lecturer_id"),
-            inverseJoinColumns = @JoinColumn(name = "course_id")
-    )
-    private List<Course> courses;
+    @OneToMany(mappedBy = "lecturer")
+    private List<LecturerCourse> courses;
 }

@@ -6,6 +6,7 @@ import lombok.Setter;
 import self.learning.backend.dto.course.CourseResponseDTO;
 import self.learning.backend.dto.student.StudentResponseDTO;
 import self.learning.backend.model.EnrollmentStatus;
+import self.learning.backend.model.LecturerCourse;
 
 import java.time.LocalDateTime;
 
@@ -16,5 +17,5 @@ public class EnrollmentResponseDTO {
     private EnrollmentStatus status;
     private LocalDateTime enrollAt;
     private LocalDateTime lastUpdate;
-    private CourseResponseDTO course;
+    private LecturerCourse lecturerCourse;
 }

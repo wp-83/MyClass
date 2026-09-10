@@ -33,8 +33,8 @@ public class Enrollment {
     private Student student;
 
     @ManyToOne
-    @JoinColumn(name = "course_id")
-    private Course course;
+    @JoinColumn(name = "lecturer_course_id")
+    private LecturerCourse lecturerCourse;
 
     @PrePersist
     protected void onCreate(){

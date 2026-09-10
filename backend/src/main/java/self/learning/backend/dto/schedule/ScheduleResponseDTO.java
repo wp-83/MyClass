@@ -12,7 +12,9 @@ public class ScheduleResponseDTO {
     private Long id;
     private String room;
     private Integer capacity;
+    private Integer totalEnroll;
     private Integer dayOfWeek;
     private LocalTime startTime;
     private LocalTime endTime;
+    private Boolean isOccupied;
 }

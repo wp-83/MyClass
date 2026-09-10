@@ -24,17 +24,27 @@ public class ScheduleService {
                 .sorted(Comparator.comparing(Schedule::getDayOfWeek)
                         .thenComparing(Schedule::getRoom)
                         .thenComparing(Schedule::getStartTime))
-                .map(schedule -> new ScheduleResponseDTO(schedule.getId(), schedule.getRoom(), schedule.getCapacity(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime()))
+                .map(schedule -> new ScheduleResponseDTO(schedule.getId(), schedule.getRoom(), schedule.getCapacity(), schedule.getTotalEnroll(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime(), schedule.getIsOccupied()))
                 .toList();
     }
 
     public ScheduleResponseDTO getScheduleById(Long id){
         Schedule schedule = scheduleRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "The schedule is not found."));
-        return new ScheduleResponseDTO(schedule.getId(), schedule.getRoom(), schedule.getCapacity(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime());
+        return new ScheduleResponseDTO(schedule.getId(), schedule.getRoom(), schedule.getCapacity(), schedule.getTotalEnroll(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime(), schedule.getIsOccupied());
     }
 
     public void createSchedule(ScheduleRequestDTO request){
         Schedule schedule = new Schedule();
+
+        List<Schedule> sameDayAndRoomSchedules = scheduleRepository.findAll().stream().filter(s ->
+                s.getDayOfWeek().equals(request.getDayOfWeek()) && s.getRoom().equals(request.getRoom())
+        ).toList();
+
+        for (Schedule s : sameDayAndRoomSchedules){
+            if (s.getStartTime().equals(request.getStartTime()) || s.getEndTime().isAfter(request.getStartTime())){
+                throw new RuntimeException("The time has been occupied by another schedule.");
+            }
+        }
 
         schedule.setRoom(request.getRoom());
         schedule.setCapacity(request.getCapacity());
@@ -47,6 +57,20 @@ public class ScheduleService {
 
     public void updateSchedule(Long id, ScheduleRequestDTO request){
         Schedule schedule = scheduleRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "The schedule is not found."));
+
+        if (request.getCapacity() < schedule.getTotalEnroll()){
+            throw new RuntimeException("The capacity cannot lower than the current total enroll.");
+        }
+
+        List<Schedule> sameDayAndRoomSchedules = scheduleRepository.findAll().stream().filter(s ->
+                s.getDayOfWeek().equals(request.getDayOfWeek()) && s.getRoom().equals(request.getRoom())
+        ).toList();
+
+        for (Schedule s : sameDayAndRoomSchedules){
+            if (s.getStartTime().equals(request.getStartTime()) || s.getEndTime().isAfter(request.getStartTime())){
+                throw new RuntimeException("The time has been occupied by another schedule.");
+            }
+        }
 
         schedule.setRoom(request.getRoom());
         schedule.setCapacity(request.getCapacity());

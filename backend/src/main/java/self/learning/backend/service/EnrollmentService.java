@@ -9,11 +9,9 @@ import self.learning.backend.dto.enrollment.EnrollmentRequestDTO;
 import self.learning.backend.dto.enrollment.EnrollmentResponseDTO;
 import self.learning.backend.dto.student.StudentResponseDTO;
 import self.learning.backend.model.*;
-import self.learning.backend.repository.CourseRepository;
-import self.learning.backend.repository.EnrollmentRepository;
-import self.learning.backend.repository.StudentDetailRepository;
-import self.learning.backend.repository.StudentRepository;
+import self.learning.backend.repository.*;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,12 +22,14 @@ public class EnrollmentService {
     private final StudentRepository studentRepository;
     private final StudentDetailRepository studentDetailRepository;
     private final CourseRepository courseRepository;
+    private final LecturerCourseRepository lecturerCourseRepository;
 
-    public EnrollmentService(EnrollmentRepository enrollmentRepository, StudentRepository studentRepository, StudentDetailRepository studentDetailRepository, CourseRepository courseRepository) {
+    public EnrollmentService(EnrollmentRepository enrollmentRepository, StudentRepository studentRepository, StudentDetailRepository studentDetailRepository, CourseRepository courseRepository, LecturerCourseRepository lecturerCourseRepository) {
         this.enrollmentRepository = enrollmentRepository;
         this.studentRepository = studentRepository;
         this.studentDetailRepository = studentDetailRepository;
         this.courseRepository = courseRepository;
+        this.lecturerCourseRepository = lecturerCourseRepository;
     }
 
     public List<StudentEnrollmentResponseDTO> allEnrollmentByStudent(){
@@ -41,7 +41,7 @@ public class EnrollmentService {
         return enrollmentByStudents.entrySet().stream().map(
                 entry -> {
                     Long studentId = entry.getKey();
-                    Student student = studentRepository.findById(studentId);
+                    Student student = studentRepository.findById(studentId).orElseThrow();
                     StudentDetail studentDetail = studentDetailRepository.findByStudentId(studentId);
 
                     StudentResponseDTO studentResponse = new StudentResponseDTO(
@@ -57,13 +57,7 @@ public class EnrollmentService {
                                     enrollment.getStatus(),
                                     enrollment.getEnrollAt(),
                                     enrollment.getLastUpdate(),
-                                    new CourseResponseDTO(
-                                            enrollment.getCourse().getId(),
-                                            enrollment.getCourse().getCode(),
-                                            enrollment.getCourse().getName(),
-                                            enrollment.getCourse().getCredit(),
-                                            enrollment.getCourse().getMinSemester()
-                                    )
+                                    enrollment.getLecturerCourse()
                             )
                     ).toList();
 
@@ -91,13 +85,7 @@ public class EnrollmentService {
                 enrollment.getStatus(),
                 enrollment.getEnrollAt(),
                 enrollment.getLastUpdate(),
-                new CourseResponseDTO(
-                        enrollment.getCourse().getId(),
-                        enrollment.getCourse().getCode(),
-                        enrollment.getCourse().getName(),
-                        enrollment.getCourse().getCredit(),
-                        enrollment.getCourse().getMinSemester()
-                )
+                enrollment.getLecturerCourse()
         )).toList();
 
         return new StudentEnrollmentResponseDTO(
@@ -108,22 +96,58 @@ public class EnrollmentService {
 
     public void createEnrollment(EnrollmentRequestDTO request){
         Student student = studentRepository.findById(request.getStudentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Student data is not valid."));
-        List<Course> courses = courseRepository.findAllById(request.getCourseId()).stream().filter(course ->
+        List<Course> courses = courseRepository.findAllById(request.getLecturerCourses().stream()
+                        .map(lecturerCourse -> lecturerCourse.getCourse().getId())
+                        .toList()
+                ).stream().filter(course ->
                 course.getMinSemester() <= student.getStudentDetail().getSemester()
         ).toList();
 
         int totalCourseCredits;
         totalCourseCredits = courses.stream().mapToInt(Course::getCredit).sum();
 
-        if (courses.size() < request.getCourseId().size() || totalCourseCredits > student.getStudentDetail().getMaxCredit()){
+        // validate the valid course and the maximum credits
+        if (courses.size() < request.getLecturerCourses().size() || totalCourseCredits > student.getStudentDetail().getMaxCredit()){
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some courses cannot be enrolled by you.");
         }
 
-        for (Course course : courses){
+        List<LecturerCourse> lecturerCourses = lecturerCourseRepository.findAllById(request.getLecturerCourses().stream().map(LecturerCourse::getId).toList());
+        lecturerCourses = lecturerCourses.stream().sorted(
+                Comparator.comparing((LecturerCourse lecturerCourse) -> lecturerCourse.getSchedule().getDayOfWeek())
+                        .thenComparing(lecturerCourse -> lecturerCourse.getSchedule().getStartTime())
+                        .thenComparing(lecturerCourse -> lecturerCourse.getSchedule().getEndTime())
+        ).toList();
+
+        // validate the slot of the course schedule
+        for (LecturerCourse lc : lecturerCourses){
+            Boolean isReachLimit = ((lc.getSchedule().getTotalEnroll() + 1) > (lc.getSchedule().getCapacity()));
+
+            if (isReachLimit.equals(Boolean.TRUE)){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("The capacity of %s course is reached the limit.", lc.getCourse().getName()));
+            }
+        }
+
+        // validate the time for all courses that enrolled
+        int iterations = lecturerCourses.size() - 1;
+        for (int i = 0; i <= iterations; i++){
+            Schedule firstSchedule = lecturerCourses.get(i).getSchedule();
+            Schedule secondSchedule = lecturerCourses.get(i + 1).getSchedule();
+
+            String firtCourseName = lecturerCourses.get(i).getCourse().getName();
+            String secondCourseName = lecturerCourses.get(i + 1).getCourse().getName();
+
+            if (firstSchedule.getDayOfWeek().equals(secondSchedule.getDayOfWeek())){
+                if (firstSchedule.getStartTime().equals(secondSchedule.getStartTime()) || firstSchedule.getEndTime().isAfter(secondSchedule.getStartTime())){
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Schedule of %s and %s is overlap. You cannot take them together.", firtCourseName, secondCourseName));
+                }
+            }
+        }
+
+        for (LecturerCourse lc : lecturerCourses){
             Enrollment enrollment = new Enrollment();
 
             enrollment.setStudent(student);
-            enrollment.setCourse(course);
+            enrollment.setLecturerCourse(lc);
 
             enrollmentRepository.save(enrollment);
         }
@@ -139,7 +163,7 @@ public class EnrollmentService {
         List<Enrollment> enrollments = enrollmentRepository.findAllByStudentId(studentId);
 
         if (enrollments.size() <= 0){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No enrollment by the student.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No enrollment is done by the student.");
         }
 
         for (Enrollment enrollment : enrollments){
@@ -147,7 +171,7 @@ public class EnrollmentService {
             this.enrollmentRepository.save(enrollment);
         }
 
-        Student student = studentRepository.findById(studentId);
+        Student student = studentRepository.findById(studentId).orElseThrow();
         StudentDetail studentDetail = student.getStudentDetail();
         studentDetail.setSemester(studentDetail.getSemester() + 1);
         studentDetailRepository.save(studentDetail);

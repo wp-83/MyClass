@@ -36,9 +36,6 @@ public class Course {
     @Max(8)
     private Integer minSemester;
 
-    @ManyToMany(mappedBy = "courses")
-    private List<Lecturer> lecturers;
-
     @OneToMany(mappedBy = "course")
-    private List<Enrollment> enrollments;
+    private List<LecturerCourse> lecturers;
 }
