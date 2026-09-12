@@ -1,0 +1,33 @@
+@use "bootstrap/scss/bootstrap" with (
+  $primary: #0072CE,
+  $secondary: #F58220,
+
+  $success: #198754,
+  $danger: #DC3545,
+  $warning: #FFC107,
+  $info: #0DCAF0,
+
+  $light: #F5F9FC,
+  $dark: #1F2933
+);
+
+// Custom colors
+:root {
+  --bs-tertiary: #00A6A6;
+}
+
+// Custom navbar
+.navbar {
+  .nav-link {
+    color: rgba(var(--bs-primary-rgb), .75);
+
+    &:hover {
+      color: var(--bs-secondary);
+    }
+
+    &.active {
+      color: var(--bs-tertiary);
+      font-weight: bold;
+    }
+  }
+}
